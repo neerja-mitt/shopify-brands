@@ -13,9 +13,10 @@ required to run the suite):
 - Visibility rules — `src/sync/visibility.ts` (§5.3)
 - HMAC webhook verification — `src/shopify/webhooks.ts` `verifyHmac` (§4.5)
 - Token encryption at rest (AES-256-GCM) — `src/crypto/tokens.ts` (§4.3)
-- Persistence layer — repository ports (`src/db/repositories.ts`) + fully-tested
-  in-memory adapter (`src/db/memory.ts`, encrypts tokens at its boundary).
-  Postgres adapter (`src/db/postgres.ts`) is a documented stub. (§5.1)
+- Persistence layer — repository ports + **both** adapters: in-memory
+  (`src/db/memory.ts`) and Postgres (`src/db/postgres.ts`, real SQL tested via
+  pg-mem), encrypting tokens at the boundary. Migration runner applies the DDL
+  (`src/db/schema.ts` / `migrate.ts`) on boot. (§5.1)
 - OAuth install flow — `src/shopify/oauth.ts` (authorize URL, CSRF state, OAuth
   HMAC, SSRF-safe shop guard, `completeInstall`). (§4.3)
 - HTTP server — `src/http/server.ts` (`/health`, `/auth`, `/auth/callback`,
@@ -24,7 +25,7 @@ required to run the suite):
   (`src/shopify/webhooks.ts`).
 - Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
-Run `npm test` (49 tests) and `npm run typecheck`.
+Run `npm test` (55 tests) and `npm run typecheck`.
 
 ---
 
@@ -34,7 +35,7 @@ Run `npm test` (49 tests) and `npm run typecheck`.
 |---|---|---|---|
 | 0.1 | Create public (unlisted) app in Partner dashboard; configure scopes `read_products`, `read_inventory`, `write_inventory`, `read_locations` | _(external — Dev Dashboard)_; runbook: [`PARTNER_SETUP.md`](PARTNER_SETUP.md) + [`shopify.app.toml`](../shopify.app.toml) | ◑ app `Grape Merchant Sync` created & active: 4 scopes, embedded=false, redirect=`/auth/callback`, api 2026-04. Pending: credentials → local `.env`; compliance webhooks (set when webhook handler wired) |
 | 0.2 | OAuth install-by-link flow: authorize URL + callback | `src/shopify/oauth.ts`, `src/http/server.ts` | ◑ logic + HTTP routes (`/auth`, `/auth/callback`) wired & tested. Pending: live install against a deployed URL |
-| 0.3 | On install, persist shop domain, **encrypted** token, primary `location_id` (via `read_locations`), status=active | `src/shopify/oauth.ts`, `src/db/` | ◑ `completeInstall` exchanges code, fetches primary location, persists active store (token encrypted) — done & tested; live HTTP exchange/location impls written (not yet run against a real store); Postgres adapter pending |
+| 0.3 | On install, persist shop domain, **encrypted** token, primary `location_id` (via `read_locations`), status=active | `src/shopify/oauth.ts`, `src/db/` | ◑ `completeInstall` exchanges code, fetches primary location, persists active store (token encrypted) into Postgres — done & tested; live HTTP exchange/location impls written (not yet run against a real store) |
 | 0.4 | Register mandatory webhooks (`app/uninstalled`, `customers/data_request`, `customers/redact`, `shop/redact`) | `src/shopify/oauth.ts`, `src/shopify/webhooks.ts` | ◑ receiver endpoint + topic dispatch (uninstall/compliance) done & tested; **subscription registration at install** pending |
 | 0.5 | HMAC verification on every webhook | `src/shopify/webhooks.ts`, `src/http/server.ts` | ☑ enforced on the `/webhooks/shopify` route (rejects bad HMAC) |
 
@@ -42,7 +43,7 @@ Run `npm test` (49 tests) and `npm run typecheck`.
 
 | # | Task | File(s) | Status |
 |---|---|---|---|
-| 1.1 | `merchant_product_map` table; key off `shopify_variant_id` | `src/db/schema.sql`, `src/db/` | ◑ DDL + repository port + in-memory adapter done & tested (PK + grape/inventory lookups); Postgres adapter pending |
+| 1.1 | `merchant_product_map` table; key off `shopify_variant_id` | `src/db/schema.ts`, `src/db/` | ☑ DDL + migration runner + ports + **both** adapters (in-memory & Postgres) done & tested. Postgres SQL exercised against pg-mem (PK, lookups, encryption-at-rest, FK) |
 | 1.2 | Initial import via GraphQL Admin API: paginate products + variants + inventory + price | `src/sync/catalogue.ts`, `src/shopify/client.ts` | ☐ |
 | 1.3 | Run through auto-tagging/styling pipeline → auto-publish | `src/sync/catalogue.ts` | ☐ |
 | 1.4 | Apply Shopify-state → visibility rules (§5.3) | `src/sync/catalogue.ts`, `src/sync/visibility.ts` | ◑ `resolveVisibility` done + tested; applied during import pending |

@@ -40,10 +40,11 @@ A single Node service (`Dockerfile` → `node dist/index.js`) exposing:
 Build/deploy config: `Dockerfile`, `.dockerignore`, `railway.json`
 (healthcheck `/health`, restart-on-failure).
 
-> **Persistence caveat:** the service currently boots with the **in-memory**
-> store adapter — data does NOT survive a restart. Wiring the Postgres adapter
-> (`src/db/postgres.ts`) against a Railway Postgres is the next infra step
-> before anything relies on durable storage.
+> **Persistence:** with `DATABASE_URL` set, the service uses the Postgres
+> adapter and applies the schema migration on boot (idempotent). Without it (no
+> `DATABASE_URL`), it falls back to a non-durable in-memory store and logs a
+> warning — fine for a local smoke test, not for real data. So: add the Railway
+> Postgres (step 2) and the service persists installs automatically.
 
 ## First deploy — steps
 

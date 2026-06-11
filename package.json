@@ -17,10 +17,13 @@
     "test": "tsc -p tsconfig.test.json && node --test \"dist-test/**/*.test.js\""
   },
   "dependencies": {
-    "@shopify/shopify-api": "^11.0.0"
+    "@shopify/shopify-api": "^11.0.0",
+    "pg": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.20.0",
+    "pg-mem": "^3.0.14",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.0"
   }

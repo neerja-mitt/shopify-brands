@@ -24,8 +24,9 @@ src/
   index.ts            App entry point (bootstrap — not wired yet)
   config/             Validated env-backed configuration
   db/
-    schema.sql        Postgres DDL — stores + merchant_product_map (spec §5.1)
-    index.ts          Persistence access layer (stub)
+    schema.ts         Postgres DDL — stores + merchant_product_map (spec §5.1)
+    migrate.ts        Idempotent migration runner (applied on boot)
+    repositories.ts   Ports; memory.ts + postgres.ts adapters
   types/              Shared domain types mirroring the data model
   shopify/
     oauth.ts          OAuth install-by-link flow (Phase 0)

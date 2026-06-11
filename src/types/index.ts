@@ -1,7 +1,7 @@
 /**
  * Shared domain types (SCAFFOLD).
  *
- * Mirrors the data model in `src/db/schema.sql` (spec §5). These are the
+ * Mirrors the data model in `src/db/schema.ts` (spec §5). These are the
  * contracts the sync/writeback/portal layers type against. No logic here.
  */
 
