@@ -65,8 +65,14 @@ credentials needed to run the suite):
 - **Persistence layer** — repository ports (`src/db/repositories.ts`) with a
   fully-tested in-memory adapter (`src/db/memory.ts`) that encrypts tokens at its
   boundary; a Postgres adapter (`src/db/postgres.ts`) is stubbed for production (§5.1)
+- **OAuth install flow** — authorize URL, CSRF state, callback HMAC, SSRF-safe
+  shop guard, token exchange + location fetch + persist (`src/shopify/oauth.ts`) (§4.3)
+- **HTTP server** — `/health`, `/auth`, `/auth/callback`, `/webhooks/shopify`
+  (`src/http/server.ts`), with an HMAC-verified webhook receiver
+- **Deploy config** — Railway (`Dockerfile`, `railway.json`); see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
 
-Everything else remains a typed `Not implemented (Phase N)` stub. See
+The remaining catalogue sync / writeback / portal pieces are typed
+`Not implemented (Phase N)` stubs. See
 [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for live status.
 
 ## Non-negotiable rules (from the spec)

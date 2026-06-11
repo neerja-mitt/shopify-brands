@@ -16,8 +16,15 @@ required to run the suite):
 - Persistence layer — repository ports (`src/db/repositories.ts`) + fully-tested
   in-memory adapter (`src/db/memory.ts`, encrypts tokens at its boundary).
   Postgres adapter (`src/db/postgres.ts`) is a documented stub. (§5.1)
+- OAuth install flow — `src/shopify/oauth.ts` (authorize URL, CSRF state, OAuth
+  HMAC, SSRF-safe shop guard, `completeInstall`). (§4.3)
+- HTTP server — `src/http/server.ts` (`/health`, `/auth`, `/auth/callback`,
+  `/webhooks/shopify`) + composition root `src/index.ts`.
+- Webhook receiver — HMAC-verified, dispatch handles uninstall/compliance
+  (`src/shopify/webhooks.ts`).
+- Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
-Run `npm test` (31 tests) and `npm run typecheck`.
+Run `npm test` (49 tests) and `npm run typecheck`.
 
 ---
 
@@ -26,10 +33,10 @@ Run `npm test` (31 tests) and `npm run typecheck`.
 | # | Task | File(s) | Status |
 |---|---|---|---|
 | 0.1 | Create public (unlisted) app in Partner dashboard; configure scopes `read_products`, `read_inventory`, `write_inventory`, `read_locations` | _(external — Dev Dashboard)_; runbook: [`PARTNER_SETUP.md`](PARTNER_SETUP.md) + [`shopify.app.toml`](../shopify.app.toml) | ◑ app `Grape Merchant Sync` created & active: 4 scopes, embedded=false, redirect=`/auth/callback`, api 2026-04. Pending: credentials → local `.env`; compliance webhooks (set when webhook handler wired) |
-| 0.2 | OAuth install-by-link flow: authorize URL + callback | `src/shopify/oauth.ts` | ◑ authorize URL, `state` CSRF nonce, OAuth-HMAC verify, shop-domain SSRF guard, full `completeInstall` orchestration done & tested (12 tests). Pending: HTTP route wiring (needs server) |
+| 0.2 | OAuth install-by-link flow: authorize URL + callback | `src/shopify/oauth.ts`, `src/http/server.ts` | ◑ logic + HTTP routes (`/auth`, `/auth/callback`) wired & tested. Pending: live install against a deployed URL |
 | 0.3 | On install, persist shop domain, **encrypted** token, primary `location_id` (via `read_locations`), status=active | `src/shopify/oauth.ts`, `src/db/` | ◑ `completeInstall` exchanges code, fetches primary location, persists active store (token encrypted) — done & tested; live HTTP exchange/location impls written (not yet run against a real store); Postgres adapter pending |
-| 0.4 | Register mandatory webhooks (`app/uninstalled`, `customers/data_request`, `customers/redact`, `shop/redact`) | `src/shopify/oauth.ts`, `src/shopify/webhooks.ts` | ☐ |
-| 0.5 | HMAC verification on every webhook | `src/shopify/webhooks.ts` | ◑ `verifyHmac` done + tested; per-route wiring pending |
+| 0.4 | Register mandatory webhooks (`app/uninstalled`, `customers/data_request`, `customers/redact`, `shop/redact`) | `src/shopify/oauth.ts`, `src/shopify/webhooks.ts` | ◑ receiver endpoint + topic dispatch (uninstall/compliance) done & tested; **subscription registration at install** pending |
+| 0.5 | HMAC verification on every webhook | `src/shopify/webhooks.ts`, `src/http/server.ts` | ☑ enforced on the `/webhooks/shopify` route (rejects bad HMAC) |
 
 ## Phase 1 — Catalogue sync (PULL) — build & test alone first
 
