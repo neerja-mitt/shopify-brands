@@ -40,7 +40,7 @@ URL conventions used below (all derived from `APP_URL` in `.env`):
 
 1. **Create the app**
    Partner dashboard → **Apps → Create app → Create app manually**.
-   Name it (e.g. `Grape Catalogue Sync`). This generates the app with a
+   Name it (e.g. `Grape Merchant Sync`). This generates the app with a
    **Client ID** (= `SHOPIFY_API_KEY`) and **Client secret** (= `SHOPIFY_API_SECRET`).
 
 2. **Copy the credentials** → into `.env`:

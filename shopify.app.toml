@@ -9,7 +9,7 @@
 # GDPR compliance webhooks required even while unlisted (§4.4).
 
 # client_id = ""   # filled in by `shopify app config link`
-name = "Grape Catalogue Sync"
+name = "Grape Merchant Sync"
 application_url = "https://localhost:3000"
 embedded = false
 
