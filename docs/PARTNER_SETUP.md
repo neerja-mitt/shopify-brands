@@ -70,7 +70,7 @@ URL conventions used below (all derived from `APP_URL` in `.env`):
    - Shop data erasure → `https://<your-host>/webhooks/shopify`
    (We verify HMAC and route by the `X-Shopify-Topic` header — one endpoint is fine.)
 
-6. **API version** — pin to `2025-01` (matches `SHOPIFY_API_VERSION`). Bump
+6. **API version** — pin to `2026-04` (matches `SHOPIFY_API_VERSION`). Bump
    deliberately, not automatically.
 
 7. **Leave it unlisted** — do **not** click "Submit for review" / don't start
@@ -127,7 +127,7 @@ testing you can also use the **"Select store / Install"** button on the app's
 - [ ] App URL + `/auth/callback` redirect URL configured.
 - [ ] Embedded app is **OFF**.
 - [ ] Three GDPR compliance webhooks point at `/webhooks/shopify`.
-- [ ] API version is `2025-01`.
+- [ ] API version is `2026-04`.
 - [ ] App is **unlisted** (not submitted for review).
 - [ ] A development store exists with a few products to sync.
 

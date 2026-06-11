@@ -23,7 +23,7 @@ redirect_urls = [
 ]
 
 [webhooks]
-api_version = "2025-01"
+api_version = "2026-04"
 
 # Mandatory GDPR compliance webhooks (§4.4) — required even when unlisted.
 [webhooks.privacy_compliance]

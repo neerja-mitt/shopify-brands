@@ -36,7 +36,7 @@ export const config = {
       'read_products,read_inventory,write_inventory,read_locations')
       .split(',')
       .map((s) => s.trim()),
-    apiVersion: process.env.SHOPIFY_API_VERSION ?? '2025-01',
+    apiVersion: process.env.SHOPIFY_API_VERSION ?? '2026-04',
   },
 
   /** 32-byte hex key used to encrypt Shopify tokens at rest (spec §4.3). */
