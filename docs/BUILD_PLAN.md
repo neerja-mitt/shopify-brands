@@ -6,15 +6,18 @@ proven first** — everything depends on the mapping table being correct.
 
 Legend: ☐ not started · ◑ in progress · ☑ done.
 
-**Implemented so far** (dependency-free correctness core, fully unit-tested — no
-DB or Shopify credentials required to run):
+**Implemented so far** (fully unit-tested — no live DB or Shopify credentials
+required to run the suite):
 
 - Sellable-qty formula — `src/sync/sellable.ts` (§5.2)
 - Visibility rules — `src/sync/visibility.ts` (§5.3)
 - HMAC webhook verification — `src/shopify/webhooks.ts` `verifyHmac` (§4.5)
 - Token encryption at rest (AES-256-GCM) — `src/crypto/tokens.ts` (§4.3)
+- Persistence layer — repository ports (`src/db/repositories.ts`) + fully-tested
+  in-memory adapter (`src/db/memory.ts`, encrypts tokens at its boundary).
+  Postgres adapter (`src/db/postgres.ts`) is a documented stub. (§5.1)
 
-Run `npm test` (21 tests) and `npm run typecheck`.
+Run `npm test` (31 tests) and `npm run typecheck`.
 
 ---
 
@@ -24,7 +27,7 @@ Run `npm test` (21 tests) and `npm run typecheck`.
 |---|---|---|---|
 | 0.1 | Create public (unlisted) app in Partner dashboard; configure scopes `read_products`, `read_inventory`, `write_inventory`, `read_locations` | _(external — Partner dashboard)_ | ☐ |
 | 0.2 | OAuth install-by-link flow: authorize URL + callback | `src/shopify/oauth.ts` | ☐ |
-| 0.3 | On install, persist shop domain, **encrypted** token, primary `location_id` (via `read_locations`), status=active | `src/shopify/oauth.ts`, `src/db/index.ts` | ◑ token encrypt/decrypt done (`src/crypto/tokens.ts`); persistence pending |
+| 0.3 | On install, persist shop domain, **encrypted** token, primary `location_id` (via `read_locations`), status=active | `src/shopify/oauth.ts`, `src/db/` | ◑ token crypto + store repository (port + in-memory adapter) done & tested; Postgres adapter + install-time wiring pending |
 | 0.4 | Register mandatory webhooks (`app/uninstalled`, `customers/data_request`, `customers/redact`, `shop/redact`) | `src/shopify/oauth.ts`, `src/shopify/webhooks.ts` | ☐ |
 | 0.5 | HMAC verification on every webhook | `src/shopify/webhooks.ts` | ◑ `verifyHmac` done + tested; per-route wiring pending |
 
@@ -32,7 +35,7 @@ Run `npm test` (21 tests) and `npm run typecheck`.
 
 | # | Task | File(s) | Status |
 |---|---|---|---|
-| 1.1 | `merchant_product_map` table; key off `shopify_variant_id` | `src/db/schema.sql` | ☐ |
+| 1.1 | `merchant_product_map` table; key off `shopify_variant_id` | `src/db/schema.sql`, `src/db/` | ◑ DDL + repository port + in-memory adapter done & tested (PK + grape/inventory lookups); Postgres adapter pending |
 | 1.2 | Initial import via GraphQL Admin API: paginate products + variants + inventory + price | `src/sync/catalogue.ts`, `src/shopify/client.ts` | ☐ |
 | 1.3 | Run through auto-tagging/styling pipeline → auto-publish | `src/sync/catalogue.ts` | ☐ |
 | 1.4 | Apply Shopify-state → visibility rules (§5.3) | `src/sync/catalogue.ts`, `src/sync/visibility.ts` | ◑ `resolveVisibility` done + tested; applied during import pending |

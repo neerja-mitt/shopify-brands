@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { test } from 'node:test';
 
-import { verifyHmac } from './webhooks.ts';
+import { verifyHmac } from './webhooks.js';
 
 const SECRET = 'test_app_secret';
 

@@ -49,7 +49,7 @@ docs/
 cp .env.example .env      # fill in Shopify credentials + DATABASE_URL
 npm install
 npm run typecheck         # type-checks clean (src + tests)
-npm test                  # runs the unit suite (Node native runner)
+npm test                  # compiles to dist-test/ and runs the unit suite
 npm run dev               # boots the (empty) skeleton
 ```
 
@@ -62,6 +62,9 @@ credentials needed to run the suite):
 - **Visibility rules** — `src/sync/visibility.ts` (§5.3)
 - **HMAC webhook verification** — `src/shopify/webhooks.ts` (§4.5)
 - **Token encryption at rest** (AES-256-GCM) — `src/crypto/tokens.ts` (§4.3)
+- **Persistence layer** — repository ports (`src/db/repositories.ts`) with a
+  fully-tested in-memory adapter (`src/db/memory.ts`) that encrypts tokens at its
+  boundary; a Postgres adapter (`src/db/postgres.ts`) is stubbed for production (§5.1)
 
 Everything else remains a typed `Not implemented (Phase N)` stub. See
 [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for live status.

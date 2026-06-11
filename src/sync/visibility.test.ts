@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { resolveVisibility } from './visibility.ts';
+import { resolveVisibility } from './visibility.js';
 
 test('active with sellable stock is buyable', () => {
   assert.equal(resolveVisibility('active', 3), 'buyable');

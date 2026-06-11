@@ -1,26 +1,11 @@
 /**
- * Database access layer (SCAFFOLD — spec §5).
+ * Persistence layer (spec §5) — barrel.
  *
- * Thin entry point for persistence. The schema lives in `schema.sql`; a real
- * client (pg / a query builder / an ORM) gets wired here once Phase 1 starts.
- * Kept dependency-free at scaffold stage so the skeleton type-checks.
+ * The app depends on the repository ports; pick a concrete adapter at the
+ * composition root. In-memory for tests/scaffold, Postgres for production.
+ * Schema: `schema.sql`.
  */
 
-import type { MerchantProductMap, Store } from '../types/index.js';
-
-/** Look up a store by domain (token returned decrypted, in-memory only). */
-export async function getStore(_shopDomain: string): Promise<Store | null> {
-  throw new Error('Not implemented (Phase 0): getStore');
-}
-
-/** Upsert a variant mapping row, keyed on (shop_domain, shopify_variant_id). */
-export async function upsertMapping(_row: MerchantProductMap): Promise<void> {
-  throw new Error('Not implemented (Phase 1): upsertMapping');
-}
-
-/** Resolve a Grape variant back to its Shopify mapping (writeback path). */
-export async function getMappingByGrapeVariant(
-  _grapeVariantId: string,
-): Promise<MerchantProductMap | null> {
-  throw new Error('Not implemented (Phase 2): getMappingByGrapeVariant');
-}
+export type { ProductMapRepository, StoreRepository } from './repositories.js';
+export { InMemoryProductMapRepository, InMemoryStoreRepository } from './memory.js';
+export { PostgresProductMapRepository, PostgresStoreRepository } from './postgres.js';

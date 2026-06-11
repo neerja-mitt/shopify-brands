@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { computeSellableQty } from './sellable.ts';
+import { computeSellableQty } from './sellable.js';
 
 test('subtracts in-flight orders and the oversell buffer from the baseline', () => {
   assert.equal(

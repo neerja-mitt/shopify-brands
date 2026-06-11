@@ -1,13 +1,12 @@
 {
-  // Typecheck-only config for tests. Tests import with explicit `.ts` extensions
-  // because they run under Node's native test runner (--experimental-strip-types),
-  // which resolves the real files — not the emitted `.js`. So this config allows
-  // `.ts` import specifiers and never emits.
+  // Compiles src + tests to `dist-test/` and the suite runs the emitted JS via
+  // Node's test runner. This keeps tests production-faithful: the same `.js`
+  // import specifiers and ESM resolution as the real build, no runtime type
+  // stripping. The production `build` (tsconfig.json) excludes tests.
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "noEmit": true,
-    "allowImportingTsExtensions": true
+    "outDir": "dist-test"
   },
-  "include": ["src/**/*.test.ts", "src/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-test"]
 }
