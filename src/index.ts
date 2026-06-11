@@ -6,9 +6,11 @@
  * on boot), otherwise the in-memory store (non-durable — dev/smoke only).
  */
 
+import cron from 'node-cron';
 import { Pool } from 'pg';
 
 import { config } from './config/index.js';
+import { reconcileAllStores, reportDrift } from './safety/reconcile.js';
 import type { ProductMapRepository, StoreRepository } from './db/repositories.js';
 import { InMemoryProductMapRepository, InMemoryStoreRepository } from './db/memory.js';
 import { runMigrations } from './db/migrate.js';
@@ -65,6 +67,18 @@ async function main(): Promise<void> {
   server.listen(config.port, () => {
     console.log(`[grape-shopify] listening on :${config.port} (env=${config.env})`);
   });
+
+  // Nightly reconcile (spec §6 step 16). Re-baselines stock and flags drift.
+  if (cron.validate(config.safety.reconcileCron)) {
+    cron.schedule(config.safety.reconcileCron, async () => {
+      console.log('[reconcile] starting sweep');
+      const drift = await reconcileAllStores(stores, { graphql, maps: productMap });
+      reportDrift(drift, config.safety.driftAlertDestination);
+    });
+    console.log(`[grape-shopify] reconcile scheduled: ${config.safety.reconcileCron}`);
+  } else {
+    console.error(`[grape-shopify] invalid RECONCILE_CRON: ${config.safety.reconcileCron}`);
+  }
 }
 
 main().catch((err) => {

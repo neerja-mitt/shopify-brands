@@ -30,7 +30,7 @@ required to run the suite):
   qty/status/price and hide deleted products (`src/shopify/webhooks.ts`). (§4.5)
 - Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
-Run `npm test` (78 tests) and `npm run typecheck`.
+Run `npm test` (82 tests) and `npm run typecheck`.
 
 ---
 
@@ -74,7 +74,7 @@ Run `npm test` (78 tests) and `npm run typecheck`.
 
 | # | Task | File(s) | Status |
 |---|---|---|---|
-| 4.1 | Nightly reconcile: re-baseline `last_synced_qty`, flag drift | `src/safety/reconcile.ts` | ☐ |
+| 4.1 | Nightly reconcile: re-baseline `last_synced_qty`, flag drift | `src/safety/reconcile.ts`, `src/index.ts` | ◑ `reconcileStore` + `reconcileAllStores` (re-baseline, drift, preserves Grape IDs) done & tested; scheduled via node-cron (`RECONCILE_CRON`). Drift alerting is log-only for now (§9) |
 | 4.2 | Oversell buffer (configurable, default 1–2 units) | `src/config/index.ts`, `src/sync/sellable.ts` | ◑ default in config + applied in `computeSellableQty`; per-variant override pending |
 | 4.3 | Uninstall handling: `app/uninstalled` → mark inactive + hide catalogue | `src/shopify/webhooks.ts` | ☐ |
 

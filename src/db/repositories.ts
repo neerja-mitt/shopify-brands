@@ -21,6 +21,9 @@ export interface StoreRepository {
 
   /** Flip status — e.g. `inactive` on app/uninstalled (spec §6 step 18). */
   setStatus(shopDomain: string, status: StoreStatus): Promise<void>;
+
+  /** All active stores — used by the nightly reconcile sweep (spec §6 step 16). */
+  listActive(): Promise<Store[]>;
 }
 
 export interface ProductMapRepository {

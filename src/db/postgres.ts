@@ -92,6 +92,20 @@ export class PostgresStoreRepository implements StoreRepository {
       [shopDomain, status],
     );
   }
+
+  async listActive(): Promise<Store[]> {
+    const { rows } = await this.pool.query<StoreRow>(
+      `SELECT * FROM stores WHERE status = 'active'`,
+    );
+    return rows.map((row) => ({
+      shopDomain: row.shop_domain,
+      accessToken: decryptToken(row.access_token_encrypted, this.encryptionKey),
+      primaryLocationId: row.primary_location_id,
+      status: row.status as StoreStatus,
+      installedAt: row.installed_at,
+      updatedAt: row.updated_at,
+    }));
+  }
 }
 
 export class PostgresProductMapRepository implements ProductMapRepository {

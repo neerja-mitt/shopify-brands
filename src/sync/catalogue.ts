@@ -87,6 +87,80 @@ function availableQty(variant: VariantNode): number {
   return q?.quantity ?? 0;
 }
 
+/** A variant's current Shopify state (inventory-item, location, qty, price). */
+export interface VariantSnapshot {
+  shopifyVariantId: string;
+  shopifyInventoryItemId: string;
+  locationId: string;
+  qty: number;
+  price: number | null;
+}
+
+/** A product with its mappable variants (no-inventory variants dropped). */
+export interface ProductSnapshot {
+  shopifyProductId: string;
+  shopifyStatus: ShopifyStatus;
+  variants: VariantSnapshot[];
+}
+
+/**
+ * Fetch one page of the catalogue, parsed into product/variant snapshots.
+ * Shared by import and reconcile so the query + parsing live in one place.
+ */
+export async function fetchProductsPage(
+  store: Store,
+  graphql: ShopifyGraphQLClient,
+  cursor: string | null,
+): Promise<{ products: ProductSnapshot[]; nextCursor: string | null }> {
+  const data = await graphql.query<ProductsPageData>(store, PRODUCTS_QUERY, {
+    cursor,
+    locationId: store.primaryLocationId,
+  });
+
+  const products: ProductSnapshot[] = data.products.nodes.map((product) => ({
+    shopifyProductId: product.id,
+    shopifyStatus: toShopifyStatus(product.status),
+    variants: product.variants.nodes
+      .filter((v): v is VariantNode & { inventoryItem: { id: string } } => !!v.inventoryItem?.id)
+      .map((v) => ({
+        shopifyVariantId: v.id,
+        shopifyInventoryItemId: v.inventoryItem.id,
+        locationId: store.primaryLocationId,
+        qty: availableQty(v),
+        price: v.price === undefined ? null : Number(v.price),
+      })),
+  }));
+
+  const nextCursor = data.products.pageInfo.hasNextPage ? data.products.pageInfo.endCursor : null;
+  return { products, nextCursor };
+}
+
+/**
+ * Build a mapping row from a snapshot, preserving the Grape IDs of any existing
+ * row (so re-import/reconcile never wipes a published link).
+ */
+export function toMappingRow(
+  shopDomain: string,
+  shopifyProductId: string,
+  shopifyStatus: ShopifyStatus,
+  v: VariantSnapshot,
+  existing: MerchantProductMap | null,
+): MerchantProductMap {
+  return {
+    grapeListingId: existing?.grapeListingId ?? null,
+    grapeVariantId: existing?.grapeVariantId ?? null,
+    shopDomain,
+    shopifyProductId,
+    shopifyVariantId: v.shopifyVariantId,
+    shopifyInventoryItemId: v.shopifyInventoryItemId,
+    locationId: v.locationId,
+    lastSyncedQty: v.qty,
+    lastSyncedPrice: v.price,
+    shopifyStatus,
+    updatedAt: new Date(),
+  };
+}
+
 export interface ImportDeps {
   graphql: ShopifyGraphQLClient;
   maps: ProductMapRepository;
@@ -94,7 +168,7 @@ export interface ImportDeps {
 
 /**
  * Full catalogue import for a store. Paginates until exhausted, upserting a
- * mapping row per variant. Grape IDs are left null (published later).
+ * mapping row per variant. Grape IDs of existing rows are preserved.
  */
 export async function importCatalogue(store: Store, deps: ImportDeps): Promise<ImportResult> {
   let cursor: string | null = null;
@@ -102,39 +176,18 @@ export async function importCatalogue(store: Store, deps: ImportDeps): Promise<I
   let variants = 0;
 
   do {
-    const data: ProductsPageData = await deps.graphql.query<ProductsPageData>(
-      store,
-      PRODUCTS_QUERY,
-      { cursor, locationId: store.primaryLocationId },
-    );
-
-    for (const product of data.products.nodes) {
+    const page = await fetchProductsPage(store, deps.graphql, cursor);
+    for (const product of page.products) {
       products += 1;
-      const shopifyStatus = toShopifyStatus(product.status);
-
-      for (const variant of product.variants.nodes) {
-        const inventoryItemId = variant.inventoryItem?.id;
-        if (!inventoryItemId) continue; // no inventory item → can't map/deduct; skip
-
-        const row: MerchantProductMap = {
-          grapeListingId: null,
-          grapeVariantId: null,
-          shopDomain: store.shopDomain,
-          shopifyProductId: product.id,
-          shopifyVariantId: variant.id,
-          shopifyInventoryItemId: inventoryItemId,
-          locationId: store.primaryLocationId,
-          lastSyncedQty: availableQty(variant),
-          lastSyncedPrice: variant.price === undefined ? null : Number(variant.price),
-          shopifyStatus,
-          updatedAt: new Date(),
-        };
-        await deps.maps.upsert(row);
+      for (const v of product.variants) {
+        const existing = await deps.maps.getByShopVariant(store.shopDomain, v.shopifyVariantId);
+        await deps.maps.upsert(
+          toMappingRow(store.shopDomain, product.shopifyProductId, product.shopifyStatus, v, existing),
+        );
         variants += 1;
       }
     }
-
-    cursor = data.products.pageInfo.hasNextPage ? data.products.pageInfo.endCursor : null;
+    cursor = page.nextCursor;
   } while (cursor !== null);
 
   return { products, variants };
