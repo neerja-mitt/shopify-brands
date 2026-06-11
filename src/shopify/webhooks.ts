@@ -5,6 +5,8 @@
  * (spec §4.5). Mandatory webhooks are required even while the app is unlisted.
  */
 
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
 import type { Store } from '../types/index.js';
 
 /** Webhook topics we subscribe to (spec §4.4 mandatory + §4.5 functional). */
@@ -24,8 +26,27 @@ export type WebhookTopic =
  * the app secret. Returns true only on a constant-time match. Reject otherwise
  * — no processing happens on an unverified payload.
  */
-export function verifyHmac(_rawBody: Buffer, _hmacHeader: string): boolean {
-  throw new Error('Not implemented (Phase 0): verifyHmac');
+export function verifyHmac(rawBody: Buffer, hmacHeader: string, secret: string): boolean {
+  if (!hmacHeader || !secret) {
+    return false;
+  }
+
+  // Shopify signs the RAW request body with the app secret, base64-encoded.
+  const computed = createHmac('sha256', secret).update(rawBody).digest('base64');
+
+  const expected = Buffer.from(computed, 'base64');
+  let provided: Buffer;
+  try {
+    provided = Buffer.from(hmacHeader, 'base64');
+  } catch {
+    return false;
+  }
+
+  // Constant-time compare; bail early if lengths differ (timingSafeEqual throws otherwise).
+  if (expected.length !== provided.length) {
+    return false;
+  }
+  return timingSafeEqual(expected, provided);
 }
 
 /**

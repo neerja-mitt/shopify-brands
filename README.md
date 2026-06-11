@@ -48,9 +48,23 @@ docs/
 ```bash
 cp .env.example .env      # fill in Shopify credentials + DATABASE_URL
 npm install
-npm run typecheck         # scaffold should type-check clean
+npm run typecheck         # type-checks clean (src + tests)
+npm test                  # runs the unit suite (Node native runner)
 npm run dev               # boots the (empty) skeleton
 ```
+
+### What's implemented
+
+The dependency-free correctness core is built and unit-tested (no DB or Shopify
+credentials needed to run the suite):
+
+- **Sellable-qty formula** — `src/sync/sellable.ts` (§5.2)
+- **Visibility rules** — `src/sync/visibility.ts` (§5.3)
+- **HMAC webhook verification** — `src/shopify/webhooks.ts` (§4.5)
+- **Token encryption at rest** (AES-256-GCM) — `src/crypto/tokens.ts` (§4.3)
+
+Everything else remains a typed `Not implemented (Phase N)` stub. See
+[`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md) for live status.
 
 ## Non-negotiable rules (from the spec)
 
