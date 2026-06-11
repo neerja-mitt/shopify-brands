@@ -45,4 +45,11 @@ CREATE INDEX IF NOT EXISTS idx_mpm_grape_variant
 -- inventory_levels/update arrives keyed by inventory_item_id (§4.5).
 CREATE INDEX IF NOT EXISTS idx_mpm_inventory_item
     ON merchant_product_map (shopify_inventory_item_id);
+
+-- Self-heal: databases created before the Grape IDs were made nullable still
+-- carry NOT NULL on these columns. Dropping it is idempotent (no-op once already
+-- nullable), so it's safe to run on every boot. CREATE TABLE IF NOT EXISTS alone
+-- never alters an existing table, hence this explicit migration.
+ALTER TABLE merchant_product_map ALTER COLUMN grape_listing_id DROP NOT NULL;
+ALTER TABLE merchant_product_map ALTER COLUMN grape_variant_id DROP NOT NULL;
 `;
