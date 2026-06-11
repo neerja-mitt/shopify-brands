@@ -1,0 +1,36 @@
+# Shopify app configuration (config-as-code).
+#
+# Optional Path B in docs/PARTNER_SETUP.md. Run `shopify app config link` to
+# populate `client_id`, then `shopify app deploy` to push this config to Shopify.
+# The client SECRET is NOT here — it stays only in `.env` (SHOPIFY_API_SECRET).
+#
+# Encodes the spec's settled decisions: read-only catalogue + inventory-write
+# scopes (NO order scopes, §4.2), non-embedded (standalone portal, §2), and the
+# GDPR compliance webhooks required even while unlisted (§4.4).
+
+# client_id = ""   # filled in by `shopify app config link`
+name = "Grape Catalogue Sync"
+application_url = "https://localhost:3000"
+embedded = false
+
+[access_scopes]
+# Requested at OAuth time. Keep in sync with SHOPIFY_SCOPES in .env.
+scopes = "read_products,read_inventory,write_inventory,read_locations"
+
+[auth]
+redirect_urls = [
+  "https://localhost:3000/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+# Mandatory GDPR compliance webhooks (§4.4) — required even when unlisted.
+[webhooks.privacy_compliance]
+customer_data_request_url = "https://localhost:3000/webhooks/shopify"
+customer_deletion_url = "https://localhost:3000/webhooks/shopify"
+shop_deletion_url = "https://localhost:3000/webhooks/shopify"
+
+# NOTE: functional webhooks (products/update, products/delete,
+# inventory_levels/update) are registered programmatically at install
+# (Phase 0, step 0.4), not declared here.
