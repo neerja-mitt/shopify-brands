@@ -24,10 +24,10 @@ required to run the suite):
 - Webhook receiver — HMAC-verified, dispatch handles uninstall/compliance
   (`src/shopify/webhooks.ts`).
 - Catalogue import — GraphQL client (`src/shopify/client.ts`) + paginated
-- Live webhooks — `registerWebhooks` subscribes at install; handlers refresh
-  qty/status/price and hide deleted products (`src/shopify/webhooks.ts`). (§4.5)
   `importCatalogue` (`src/sync/catalogue.ts`) that upserts mapping rows; runs
   after install and via `GET /sync?shop=…`. (§6 step 6)
+- Live webhooks — `registerWebhooks` subscribes at install; handlers refresh
+  qty/status/price and hide deleted products (`src/shopify/webhooks.ts`). (§4.5)
 - Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
 Run `npm test` (69 tests) and `npm run typecheck`.
