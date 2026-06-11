@@ -9,30 +9,43 @@
 import { Pool } from 'pg';
 
 import { config } from './config/index.js';
-import type { StoreRepository } from './db/repositories.js';
-import { InMemoryStoreRepository } from './db/memory.js';
+import type { ProductMapRepository, StoreRepository } from './db/repositories.js';
+import { InMemoryProductMapRepository, InMemoryStoreRepository } from './db/memory.js';
 import { runMigrations } from './db/migrate.js';
-import { PostgresStoreRepository } from './db/postgres.js';
+import { PostgresProductMapRepository, PostgresStoreRepository } from './db/postgres.js';
 import { createServer } from './http/server.js';
+import { HttpShopifyGraphQLClient } from './shopify/client.js';
 import { GraphQLLocationFetcher, HttpTokenExchanger } from './shopify/oauth.js';
 
-async function buildStoreRepository(): Promise<StoreRepository> {
+interface Repositories {
+  stores: StoreRepository;
+  productMap: ProductMapRepository;
+}
+
+async function buildRepositories(): Promise<Repositories> {
   if (config.databaseUrl) {
     const pool = new Pool({ connectionString: config.databaseUrl });
     await runMigrations(pool);
     console.log('[grape-shopify] Postgres connected; migrations applied.');
-    return new PostgresStoreRepository(pool, config.tokenEncryptionKey);
+    return {
+      stores: new PostgresStoreRepository(pool, config.tokenEncryptionKey),
+      productMap: new PostgresProductMapRepository(pool),
+    };
   }
   console.log(
     '[grape-shopify] WARNING: no DATABASE_URL — using in-memory store (data is NOT durable).',
   );
-  return new InMemoryStoreRepository(config.tokenEncryptionKey);
+  return {
+    stores: new InMemoryStoreRepository(config.tokenEncryptionKey),
+    productMap: new InMemoryProductMapRepository(),
+  };
 }
 
 async function main(): Promise<void> {
-  const stores = await buildStoreRepository();
+  const { stores, productMap } = await buildRepositories();
   const tokenExchanger = new HttpTokenExchanger(config.shopify.apiKey, config.shopify.apiSecret);
   const locationFetcher = new GraphQLLocationFetcher(config.shopify.apiVersion);
+  const graphql = new HttpShopifyGraphQLClient(config.shopify.apiVersion);
 
   const server = createServer({
     config: {
@@ -44,6 +57,8 @@ async function main(): Promise<void> {
     stores,
     tokenExchanger,
     locationFetcher,
+    productMap,
+    graphql,
   });
 
   server.listen(config.port, () => {

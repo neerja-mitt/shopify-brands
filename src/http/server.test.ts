@@ -3,7 +3,8 @@ import { createHmac, randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { after, before, test } from 'node:test';
 
-import { InMemoryStoreRepository } from '../db/memory.js';
+import { InMemoryProductMapRepository, InMemoryStoreRepository } from '../db/memory.js';
+import type { ShopifyGraphQLClient } from '../shopify/client.js';
 import type { LocationFetcher, TokenExchanger } from '../shopify/oauth.js';
 import { createServer } from './server.js';
 
@@ -11,8 +12,15 @@ const API_SECRET = 'test_app_secret';
 const ENC_KEY = randomBytes(32).toString('hex');
 
 const stores = new InMemoryStoreRepository(ENC_KEY);
+const productMap = new InMemoryProductMapRepository();
 const okExchanger: TokenExchanger = { async exchange() { return { accessToken: 'tok' }; } };
 const okLocations: LocationFetcher = { async primaryLocationId() { return 'gid://shopify/Location/1'; } };
+// Returns an empty product page — enough to exercise routing without Shopify.
+const emptyGraphql: ShopifyGraphQLClient = {
+  async query<T>(): Promise<T> {
+    return { products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } as T;
+  },
+};
 
 const server = createServer({
   config: {
@@ -24,6 +32,8 @@ const server = createServer({
   stores,
   tokenExchanger: okExchanger,
   locationFetcher: okLocations,
+  productMap,
+  graphql: emptyGraphql,
 });
 
 let base = '';
@@ -42,6 +52,25 @@ test('GET /health returns ok', async () => {
   const res = await fetch(`${base}/health`);
   assert.equal(res.status, 200);
   assert.equal(await res.text(), 'ok');
+});
+
+test('GET /sync for an unknown store returns 404', async () => {
+  const res = await fetch(`${base}/sync?shop=ghost.myshopify.com`);
+  assert.equal(res.status, 404);
+});
+
+test('GET /sync for an installed store returns an import summary', async () => {
+  await stores.upsert({
+    shopDomain: 'synced.myshopify.com',
+    accessToken: 'tok',
+    primaryLocationId: 'gid://shopify/Location/1',
+    status: 'active',
+    installedAt: new Date(),
+    updatedAt: new Date(),
+  });
+  const res = await fetch(`${base}/sync?shop=synced.myshopify.com`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { products: 0, variants: 0 });
 });
 
 test('GET /auth without a valid shop is rejected', async () => {

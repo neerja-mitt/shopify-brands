@@ -29,10 +29,14 @@ export interface Store {
 /**
  * Variant-level mapping row (spec §5.1).
  * Keyed off the stable numeric `shopifyVariantId`, not the editable SKU.
+ *
+ * The Grape IDs are nullable: catalogue import populates the Shopify side first;
+ * the Grape publishing pipeline (auto-tag → create listing, Phase 1.3) fills the
+ * Grape IDs afterwards. `null` therefore means "imported, not yet published".
  */
 export interface MerchantProductMap {
-  grapeListingId: string;
-  grapeVariantId: string;
+  grapeListingId: string | null;
+  grapeVariantId: string | null;
   shopDomain: string;
   shopifyProductId: string;
   shopifyVariantId: string; // stable mapping key

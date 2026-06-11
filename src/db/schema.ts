@@ -23,8 +23,9 @@ CREATE TABLE IF NOT EXISTS stores (
 -- merchant_product_map: variant-level mapping (spec §5.1). KEY OFF the numeric
 -- shopify_variant_id, NOT the SKU — merchants edit SKUs; numeric IDs are stable.
 CREATE TABLE IF NOT EXISTS merchant_product_map (
-    grape_listing_id          TEXT        NOT NULL,
-    grape_variant_id          TEXT        NOT NULL,
+    -- Grape IDs are NULL until the publishing pipeline runs (Phase 1.3).
+    grape_listing_id          TEXT,
+    grape_variant_id          TEXT,
     shop_domain               TEXT        NOT NULL REFERENCES stores(shop_domain) ON DELETE CASCADE,
     shopify_product_id        TEXT        NOT NULL,
     shopify_variant_id        TEXT        NOT NULL,

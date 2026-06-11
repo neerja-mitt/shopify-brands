@@ -4,7 +4,8 @@
  * Exposes the endpoints Shopify and ops need:
  *   GET  /health           — liveness probe (Railway healthcheck)
  *   GET  /auth?shop=…       — start OAuth install (redirect to Shopify consent)
- *   GET  /auth/callback     — finish OAuth: verify, exchange, persist
+ *   GET  /auth/callback     — finish OAuth: verify, exchange, persist, sync
+ *   GET  /sync?shop=…       — re-run catalogue import for an installed store
  *   POST /webhooks/shopify  — verified webhook receiver
  *
  * Built on node:http (no framework) so we control the RAW request body, which
@@ -14,7 +15,8 @@
 
 import http from 'node:http';
 
-import type { StoreRepository } from '../db/repositories.js';
+import type { ProductMapRepository, StoreRepository } from '../db/repositories.js';
+import type { ShopifyGraphQLClient } from '../shopify/client.js';
 import {
   buildAuthorizeUrl,
   completeInstall,
@@ -24,6 +26,8 @@ import {
   type TokenExchanger,
 } from '../shopify/oauth.js';
 import { dispatchWebhook, verifyHmac } from '../shopify/webhooks.js';
+import { importCatalogue } from '../sync/catalogue.js';
+import type { Store } from '../types/index.js';
 
 export interface ServerConfig {
   apiKey: string;
@@ -38,6 +42,8 @@ export interface ServerDeps {
   stores: StoreRepository;
   tokenExchanger: TokenExchanger;
   locationFetcher: LocationFetcher;
+  productMap: ProductMapRepository;
+  graphql: ShopifyGraphQLClient;
 }
 
 const STATE_COOKIE = 'grape_oauth_state';
@@ -65,6 +71,17 @@ function readRawBody(req: http.IncomingMessage): Promise<Buffer> {
 function send(res: http.ServerResponse, status: number, body: string, headers: http.OutgoingHttpHeaders = {}): void {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...headers });
   res.end(body);
+}
+
+/** Run the catalogue import for a store, logging the outcome. Never throws. */
+function runImport(store: Store, deps: ServerDeps): Promise<void> {
+  return importCatalogue(store, { graphql: deps.graphql, maps: deps.productMap })
+    .then((r) => {
+      console.log(`[sync] ${store.shopDomain}: imported ${r.products} products / ${r.variants} variants`);
+    })
+    .catch((e: unknown) => {
+      console.error(`[sync] ${store.shopDomain}: import failed —`, e);
+    });
 }
 
 export function createServer(deps: ServerDeps): http.Server {
@@ -111,13 +128,16 @@ export function createServer(deps: ServerDeps): http.Server {
         }
         const query = Object.fromEntries(url.searchParams.entries());
         try {
-          await completeInstall(query, {
+          const store = await completeInstall(query, {
             stores: deps.stores,
             tokenExchanger: deps.tokenExchanger,
             locationFetcher: deps.locationFetcher,
             apiSecret: config.apiSecret,
             expectedState,
           });
+          // Kick off the initial catalogue import in the background — don't make
+          // the merchant wait on it before the redirect (§6 step 6).
+          void runImport(store, deps);
           // Clear the state cookie; send the merchant to the app.
           return send(res, 302, '', {
             Location: config.appUrl,
@@ -127,6 +147,25 @@ export function createServer(deps: ServerDeps): http.Server {
           // Verification/exchange failure — nothing was persisted.
           return send(res, 400, `Install failed: ${(err as Error).message}`);
         }
+      }
+
+      // ── Manual re-sync (testing / ops) ───────────────────────────────────
+      if (req.method === 'GET' && pathname === '/sync') {
+        const shop = url.searchParams.get('shop') ?? '';
+        if (!isValidShopDomain(shop)) {
+          return send(res, 400, 'Invalid or missing ?shop=<store>.myshopify.com');
+        }
+        const store = await deps.stores.get(shop);
+        if (!store || store.status !== 'active') {
+          return send(res, 404, 'Store not installed or not active');
+        }
+        const result = await importCatalogue(store, {
+          graphql: deps.graphql,
+          maps: deps.productMap,
+        });
+        return send(res, 200, JSON.stringify(result), {
+          'Content-Type': 'application/json; charset=utf-8',
+        });
       }
 
       // ── Webhooks ─────────────────────────────────────────────────────────
