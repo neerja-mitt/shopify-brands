@@ -27,6 +27,7 @@ import {
 } from '../shopify/oauth.js';
 import { dispatchWebhook, registerWebhooks, verifyHmac } from '../shopify/webhooks.js';
 import { importCatalogue } from '../sync/catalogue.js';
+import { onGrapeOrderConfirmed } from '../sync/inventory.js';
 import type { Store } from '../types/index.js';
 
 export interface ServerConfig {
@@ -35,6 +36,8 @@ export interface ServerConfig {
   scopes: string[];
   /** Public base URL (e.g. the Railway domain). Callback = `${appUrl}/auth/callback`. */
   appUrl: string;
+  /** Optional bearer token guarding internal endpoints (Grape → us). */
+  internalApiToken?: string;
 }
 
 export interface ServerDeps {
@@ -169,6 +172,45 @@ export function createServer(deps: ServerDeps): http.Server {
         return send(res, 200, JSON.stringify(result), {
           'Content-Type': 'application/json; charset=utf-8',
         });
+      }
+
+      // ── Grape order confirmed → inventory writeback (Phase 2) ────────────
+      if (req.method === 'POST' && pathname === '/orders/confirmed') {
+        if (config.internalApiToken) {
+          const auth = String(req.headers['authorization'] ?? '');
+          if (auth !== `Bearer ${config.internalApiToken}`) {
+            return send(res, 401, 'Unauthorized');
+          }
+        }
+        const rawBody = await readRawBody(req);
+        let body: {
+          grapeVariantId?: string;
+          shopDomain?: string;
+          shopifyVariantId?: string;
+          quantity?: number;
+        };
+        try {
+          body = JSON.parse(rawBody.toString('utf8') || '{}');
+        } catch {
+          return send(res, 400, 'Invalid JSON body');
+        }
+        const quantity = Number(body.quantity ?? 1);
+        try {
+          await onGrapeOrderConfirmed(
+            {
+              grapeVariantId: body.grapeVariantId,
+              shopDomain: body.shopDomain,
+              shopifyVariantId: body.shopifyVariantId,
+            },
+            quantity,
+            { graphql: deps.graphql, stores: deps.stores, productMap: deps.productMap },
+          );
+          return send(res, 200, 'ok');
+        } catch (err) {
+          // Log + 422 so Grape can flag for nightly reconcile (§6 step 12).
+          console.error(`[writeback] order-confirmed failed:`, err);
+          return send(res, 422, `Writeback failed: ${(err as Error).message}`);
+        }
       }
 
       // ── Webhooks ─────────────────────────────────────────────────────────

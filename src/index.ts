@@ -53,6 +53,7 @@ async function main(): Promise<void> {
       apiSecret: config.shopify.apiSecret,
       scopes: config.shopify.scopes,
       appUrl: config.appUrl,
+      internalApiToken: config.internalApiToken,
     },
     stores,
     tokenExchanger,

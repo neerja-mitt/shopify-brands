@@ -30,7 +30,7 @@ required to run the suite):
   qty/status/price and hide deleted products (`src/shopify/webhooks.ts`). (§4.5)
 - Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
-Run `npm test` (69 tests) and `npm run typecheck`.
+Run `npm test` (78 tests) and `npm run typecheck`.
 
 ---
 
@@ -59,8 +59,8 @@ Run `npm test` (69 tests) and `npm run typecheck`.
 
 | # | Task | File(s) | Status |
 |---|---|---|---|
-| 2.1 | On Grape order confirmed → `inventoryAdjustQuantities` with **negative delta** (relative adjust, never set) | `src/sync/inventory.ts` | ☐ |
-| 2.2 | Failure handling: retry on rate-limit, log on hard failure, flag for nightly reconcile. **No restore logic.** | `src/sync/inventory.ts` | ☐ |
+| 2.1 | On Grape order confirmed → `inventoryAdjustQuantities` with **negative delta** (relative adjust, never set) | `src/sync/inventory.ts`, `src/http/server.ts` | ◑ `adjustInventory` (relative −delta) + `onGrapeOrderConfirmed` + `POST /orders/confirmed` (token-guarded) done & tested. Pending: verify live |
+| 2.2 | Failure handling: retry on rate-limit, log on hard failure, flag for nightly reconcile. **No restore logic.** | `src/sync/inventory.ts` | ◑ surfaces userErrors → 422 (Grape flags for reconcile); log on failure. Rate-limit retry pending |
 
 ## Phase 3 — Grape Merchant portal (standalone web app)
 

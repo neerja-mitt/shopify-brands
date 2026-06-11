@@ -44,6 +44,13 @@ export const config = {
 
   databaseUrl: required('DATABASE_URL'),
 
+  /**
+   * Optional shared secret protecting internal endpoints that Grape calls
+   * (e.g. order-confirmed → inventory writeback). When set, callers must send
+   * `Authorization: Bearer <token>`. Unset → open (dev only).
+   */
+  internalApiToken: process.env.INTERNAL_API_TOKEN ?? '',
+
   safety: {
     // Don't sell Shopify's last unit (spec §5.2 / §6 step 17).
     oversellBufferDefault: optionalInt('OVERSELL_BUFFER_DEFAULT', 2),

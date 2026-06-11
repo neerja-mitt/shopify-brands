@@ -15,10 +15,14 @@ const stores = new InMemoryStoreRepository(ENC_KEY);
 const productMap = new InMemoryProductMapRepository();
 const okExchanger: TokenExchanger = { async exchange() { return { accessToken: 'tok' }; } };
 const okLocations: LocationFetcher = { async primaryLocationId() { return 'gid://shopify/Location/1'; } };
-// Returns an empty product page — enough to exercise routing without Shopify.
-const emptyGraphql: ShopifyGraphQLClient = {
+// Satisfies both the catalogue query (empty page) and the adjust mutation
+// (no userErrors) — enough to exercise routing without real Shopify.
+const stubGraphql: ShopifyGraphQLClient = {
   async query<T>(): Promise<T> {
-    return { products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } as T;
+    return {
+      products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+      inventoryAdjustQuantities: { userErrors: [] },
+    } as T;
   },
 };
 
@@ -33,7 +37,7 @@ const server = createServer({
   tokenExchanger: okExchanger,
   locationFetcher: okLocations,
   productMap,
-  graphql: emptyGraphql,
+  graphql: stubGraphql,
 });
 
 let base = '';
@@ -127,4 +131,47 @@ test('POST /webhooks/shopify with a valid HMAC marks an uninstalled store inacti
 
   assert.equal(res.status, 200);
   assert.equal((await stores.get(shop))?.status, 'inactive');
+});
+
+test('POST /orders/confirmed writes back inventory for a mapped variant', async () => {
+  const shop = 'seller.myshopify.com';
+  await stores.upsert({
+    shopDomain: shop,
+    accessToken: 'tok',
+    primaryLocationId: 'gid://shopify/Location/1',
+    status: 'active',
+    installedAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await productMap.upsert({
+    grapeListingId: 'gl-1',
+    grapeVariantId: 'gv-confirmed',
+    shopDomain: shop,
+    shopifyProductId: 'gid://shopify/Product/1',
+    shopifyVariantId: 'gid://shopify/ProductVariant/2',
+    shopifyInventoryItemId: 'gid://shopify/InventoryItem/3',
+    locationId: 'gid://shopify/Location/1',
+    lastSyncedQty: 5,
+    lastSyncedPrice: 9.99,
+    shopifyStatus: 'active',
+    updatedAt: new Date(),
+  });
+
+  const res = await fetch(`${base}/orders/confirmed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grapeVariantId: 'gv-confirmed', quantity: 2 }),
+  });
+
+  assert.equal(res.status, 200);
+  assert.equal((await productMap.getByGrapeVariant('gv-confirmed'))?.lastSyncedQty, 3);
+});
+
+test('POST /orders/confirmed returns 422 when the variant is unknown', async () => {
+  const res = await fetch(`${base}/orders/confirmed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grapeVariantId: 'does-not-exist', quantity: 1 }),
+  });
+  assert.equal(res.status, 422);
 });
