@@ -21,7 +21,19 @@ export interface ShopifyGraphQLClient {
 
 interface GraphQLEnvelope<T> {
   data?: T;
-  errors?: unknown;
+  errors?: Array<{ message?: string; extensions?: { code?: string } }>;
+}
+
+/** Thrown when Shopify rejects a query for rate-limiting — the caller may retry. */
+export class ShopifyThrottledError extends Error {
+  constructor(message = 'Shopify GraphQL throttled') {
+    super(message);
+    this.name = 'ShopifyThrottledError';
+  }
+}
+
+function isThrottled(errors: GraphQLEnvelope<unknown>['errors']): boolean {
+  return !!errors?.some((e) => e.extensions?.code === 'THROTTLED');
 }
 
 export class HttpShopifyGraphQLClient implements ShopifyGraphQLClient {
@@ -55,11 +67,52 @@ export class HttpShopifyGraphQLClient implements ShopifyGraphQLClient {
     }
     const body = (await res.json()) as GraphQLEnvelope<T>;
     if (body.errors) {
+      if (isThrottled(body.errors)) {
+        throw new ShopifyThrottledError();
+      }
       throw new Error(`Shopify GraphQL errors: ${JSON.stringify(body.errors)}`);
     }
     if (body.data === undefined) {
       throw new Error('Shopify GraphQL response missing data');
     }
     return body.data;
+  }
+}
+
+/**
+ * Decorator that retries on {@link ShopifyThrottledError} with exponential
+ * backoff (spec §6 step 12: "retry on rate-limit, respect throttle"). Other
+ * errors pass straight through. Compose this INSIDE the rate-limit queue so a
+ * retry doesn't jump ahead of other queued work.
+ */
+export class RetryingGraphQLClient implements ShopifyGraphQLClient {
+  private readonly inner: ShopifyGraphQLClient;
+  private readonly maxRetries: number;
+  private readonly baseDelayMs: number;
+  private readonly sleep: (ms: number) => Promise<void>;
+
+  constructor(
+    inner: ShopifyGraphQLClient,
+    options: { maxRetries?: number; baseDelayMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+  ) {
+    this.inner = inner;
+    this.maxRetries = options.maxRetries ?? 4;
+    this.baseDelayMs = options.baseDelayMs ?? 500;
+    this.sleep = options.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  }
+
+  async query<T>(store: Store, query: string, variables?: Record<string, unknown>): Promise<T> {
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await this.inner.query<T>(store, query, variables);
+      } catch (err) {
+        if (!(err instanceof ShopifyThrottledError) || attempt >= this.maxRetries) {
+          throw err;
+        }
+        await this.sleep(this.baseDelayMs * 2 ** attempt); // 500, 1000, 2000, …
+        attempt += 1;
+      }
+    }
   }
 }

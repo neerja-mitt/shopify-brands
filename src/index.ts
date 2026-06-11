@@ -17,7 +17,7 @@ import { runMigrations } from './db/migrate.js';
 import { PostgresProductMapRepository, PostgresStoreRepository } from './db/postgres.js';
 import { createServer } from './http/server.js';
 import { PerStoreRateLimitQueue, RateLimitedGraphQLClient } from './safety/rateLimitQueue.js';
-import { HttpShopifyGraphQLClient } from './shopify/client.js';
+import { HttpShopifyGraphQLClient, RetryingGraphQLClient } from './shopify/client.js';
 import { GraphQLLocationFetcher, HttpTokenExchanger } from './shopify/oauth.js';
 
 interface Repositories {
@@ -52,8 +52,10 @@ async function main(): Promise<void> {
   const rateLimitQueue = new PerStoreRateLimitQueue({
     minIntervalMs: config.rateLimit.minIntervalMs,
   });
+  // Compose: per-store queue (outermost) → throttle retry → HTTP. Retries stay
+  // inside a single queued slot so they don't jump ahead of other work.
   const graphql = new RateLimitedGraphQLClient(
-    new HttpShopifyGraphQLClient(config.shopify.apiVersion),
+    new RetryingGraphQLClient(new HttpShopifyGraphQLClient(config.shopify.apiVersion)),
     rateLimitQueue,
   );
 
