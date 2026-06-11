@@ -47,7 +47,7 @@ Run `npm test` (63 tests) and `npm run typecheck`.
 | # | Task | File(s) | Status |
 |---|---|---|---|
 | 1.1 | `merchant_product_map` table; key off `shopify_variant_id` | `src/db/schema.ts`, `src/db/` | ☑ DDL + migration runner + ports + **both** adapters (in-memory & Postgres) done & tested. Postgres SQL exercised against pg-mem (PK, lookups, encryption-at-rest, FK) |
-| 1.2 | Initial import via GraphQL Admin API: paginate products + variants + inventory + price | `src/sync/catalogue.ts`, `src/shopify/client.ts` | ◑ `importCatalogue` (paginated pull → upsert mapping rows) + GraphQL client done & tested (mocked); auto-runs after install + `/sync` endpoint. Pending: verify live against the store |
+| 1.2 | Initial import via GraphQL Admin API: paginate products + variants + inventory + price | `src/sync/catalogue.ts`, `src/shopify/client.ts` | ☑ **verified live** — pulled 17 products / 26 variants from the dev store into `merchant_product_map` (qty, price, status, inventory-item id) |
 | 1.3 | Run through auto-tagging/styling pipeline → auto-publish | `src/sync/catalogue.ts` | ☐ |
 | 1.4 | Apply Shopify-state → visibility rules (§5.3) | `src/sync/catalogue.ts`, `src/sync/visibility.ts` | ◑ `resolveVisibility` done + tested; applied during import pending |
 | 1.5 | Functional webhooks (`products/update`, `products/delete`, `inventory_levels/update`) | `src/shopify/webhooks.ts` | ☐ |
