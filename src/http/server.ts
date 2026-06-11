@@ -25,7 +25,7 @@ import {
   type LocationFetcher,
   type TokenExchanger,
 } from '../shopify/oauth.js';
-import { dispatchWebhook, verifyHmac } from '../shopify/webhooks.js';
+import { dispatchWebhook, registerWebhooks, verifyHmac } from '../shopify/webhooks.js';
 import { importCatalogue } from '../sync/catalogue.js';
 import type { Store } from '../types/index.js';
 
@@ -86,7 +86,9 @@ function runImport(store: Store, deps: ServerDeps): Promise<void> {
 
 export function createServer(deps: ServerDeps): http.Server {
   const { config } = deps;
-  const redirectUri = `${config.appUrl.replace(/\/$/, '')}/auth/callback`;
+  const baseUrl = config.appUrl.replace(/\/$/, '');
+  const redirectUri = `${baseUrl}/auth/callback`;
+  const webhookCallbackUrl = `${baseUrl}/webhooks/shopify`;
 
   return http.createServer(async (req, res) => {
     try {
@@ -135,8 +137,9 @@ export function createServer(deps: ServerDeps): http.Server {
             apiSecret: config.apiSecret,
             expectedState,
           });
-          // Kick off the initial catalogue import in the background — don't make
-          // the merchant wait on it before the redirect (§6 step 6).
+          // Subscribe to webhooks + kick off the initial catalogue import, both
+          // in the background — don't make the merchant wait before the redirect.
+          void registerWebhooks(store, { graphql: deps.graphql, callbackUrl: webhookCallbackUrl });
           void runImport(store, deps);
           // Clear the state cookie; send the merchant to the app.
           return send(res, 302, '', {
@@ -177,8 +180,17 @@ export function createServer(deps: ServerDeps): http.Server {
         }
         const topic = String(req.headers['x-shopify-topic'] ?? '');
         const shop = String(req.headers['x-shopify-shop-domain'] ?? '');
-        // Process, then ack. Handlers here are fast (status flips / logs).
-        await dispatchWebhook(topic, shop, { stores: deps.stores });
+        let payload: unknown = {};
+        try {
+          payload = rawBody.length ? JSON.parse(rawBody.toString('utf8')) : {};
+        } catch {
+          payload = {};
+        }
+        // Process, then ack. Handlers here are fast (status flips / row updates).
+        await dispatchWebhook(topic, shop, payload, {
+          stores: deps.stores,
+          productMap: deps.productMap,
+        });
         return send(res, 200, 'ok');
       }
 

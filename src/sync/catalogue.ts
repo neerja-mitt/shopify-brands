@@ -68,9 +68,10 @@ export interface ImportResult {
   variants: number;
 }
 
-/** Map Shopify's product status enum to our visibility status (§5.3). */
-function toShopifyStatus(status: string): ShopifyStatus {
-  switch (status) {
+/** Map Shopify's product status to our visibility status (§5.3).
+ * Case-insensitive: GraphQL returns `ACTIVE`, webhook payloads return `active`. */
+export function toShopifyStatus(status: string): ShopifyStatus {
+  switch (status.toUpperCase()) {
     case 'ACTIVE':
       return 'active';
     case 'ARCHIVED':

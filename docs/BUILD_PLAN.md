@@ -24,11 +24,13 @@ required to run the suite):
 - Webhook receiver — HMAC-verified, dispatch handles uninstall/compliance
   (`src/shopify/webhooks.ts`).
 - Catalogue import — GraphQL client (`src/shopify/client.ts`) + paginated
+- Live webhooks — `registerWebhooks` subscribes at install; handlers refresh
+  qty/status/price and hide deleted products (`src/shopify/webhooks.ts`). (§4.5)
   `importCatalogue` (`src/sync/catalogue.ts`) that upserts mapping rows; runs
   after install and via `GET /sync?shop=…`. (§6 step 6)
 - Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
-Run `npm test` (63 tests) and `npm run typecheck`.
+Run `npm test` (69 tests) and `npm run typecheck`.
 
 ---
 
@@ -39,7 +41,7 @@ Run `npm test` (63 tests) and `npm run typecheck`.
 | 0.1 | Create public (unlisted) app in Partner dashboard; configure scopes `read_products`, `read_inventory`, `write_inventory`, `read_locations` | _(external — Dev Dashboard)_; runbook: [`PARTNER_SETUP.md`](PARTNER_SETUP.md) + [`shopify.app.toml`](../shopify.app.toml) | ☑ app `Grape Merchant Sync` live: 4 scopes, embedded=false, redirect=Railway `/auth/callback`, api 2026-04. (Compliance webhooks still to set when functional webhooks are registered) |
 | 0.2 | OAuth install-by-link flow: authorize URL + callback | `src/shopify/oauth.ts`, `src/http/server.ts` | ☑ **verified live in production** — real dev-store install completed via Railway (`/auth` → consent → `/auth/callback`) |
 | 0.3 | On install, persist shop domain, **encrypted** token, primary `location_id` (via `read_locations`), status=active | `src/shopify/oauth.ts`, `src/db/` | ☑ **verified live** — `grape-test-store` row in Railway Postgres with encrypted token, primary location, status=active |
-| 0.4 | Register mandatory webhooks (`app/uninstalled`, `customers/data_request`, `customers/redact`, `shop/redact`) | `src/shopify/oauth.ts`, `src/shopify/webhooks.ts` | ◑ receiver endpoint + topic dispatch (uninstall/compliance) done & tested; **subscription registration at install** pending |
+| 0.4 | Register mandatory webhooks (`app/uninstalled`, `customers/data_request`, `customers/redact`, `shop/redact`) | `src/shopify/oauth.ts`, `src/shopify/webhooks.ts` | ◑ `registerWebhooks` subscribes `app/uninstalled` (+ functional) at install; receiver + dispatch done & tested. GDPR compliance webhooks still set in app config (dashboard) |
 | 0.5 | HMAC verification on every webhook | `src/shopify/webhooks.ts`, `src/http/server.ts` | ☑ enforced on the `/webhooks/shopify` route (rejects bad HMAC) |
 
 ## Phase 1 — Catalogue sync (PULL) — build & test alone first
@@ -50,7 +52,7 @@ Run `npm test` (63 tests) and `npm run typecheck`.
 | 1.2 | Initial import via GraphQL Admin API: paginate products + variants + inventory + price | `src/sync/catalogue.ts`, `src/shopify/client.ts` | ☑ **verified live** — pulled 17 products / 26 variants from the dev store into `merchant_product_map` (qty, price, status, inventory-item id) |
 | 1.3 | Run through auto-tagging/styling pipeline → auto-publish | `src/sync/catalogue.ts` | ☐ |
 | 1.4 | Apply Shopify-state → visibility rules (§5.3) | `src/sync/catalogue.ts`, `src/sync/visibility.ts` | ◑ `resolveVisibility` done + tested; applied during import pending |
-| 1.5 | Functional webhooks (`products/update`, `products/delete`, `inventory_levels/update`) | `src/shopify/webhooks.ts` | ☐ |
+| 1.5 | Functional webhooks (`products/update`, `products/delete`, `inventory_levels/update`) | `src/shopify/webhooks.ts` | ◑ registered at install + handlers done & tested (qty refresh, status/price update, delete→hidden; numeric id → gid). Pending: verify live |
 | 1.6 | Per-store rate-limit queue | `src/safety/rateLimitQueue.ts` | ☐ |
 
 ## Phase 2 — Inventory writeback (PUSH)
