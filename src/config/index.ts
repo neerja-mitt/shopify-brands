@@ -57,6 +57,11 @@ export const config = {
     reconcileCron: process.env.RECONCILE_CRON ?? '0 3 * * *',
     driftAlertDestination: process.env.DRIFT_ALERT_DESTINATION ?? '',
   },
+
+  rateLimit: {
+    // Minimum gap (ms) between consecutive Shopify calls per store (spec §6 step 10).
+    minIntervalMs: optionalInt('RATE_LIMIT_MIN_INTERVAL_MS', 0),
+  },
 } as const;
 
 export type Config = typeof config;

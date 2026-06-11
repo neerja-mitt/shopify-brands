@@ -16,6 +16,7 @@ import { InMemoryProductMapRepository, InMemoryStoreRepository } from './db/memo
 import { runMigrations } from './db/migrate.js';
 import { PostgresProductMapRepository, PostgresStoreRepository } from './db/postgres.js';
 import { createServer } from './http/server.js';
+import { PerStoreRateLimitQueue, RateLimitedGraphQLClient } from './safety/rateLimitQueue.js';
 import { HttpShopifyGraphQLClient } from './shopify/client.js';
 import { GraphQLLocationFetcher, HttpTokenExchanger } from './shopify/oauth.js';
 
@@ -47,7 +48,14 @@ async function main(): Promise<void> {
   const { stores, productMap } = await buildRepositories();
   const tokenExchanger = new HttpTokenExchanger(config.shopify.apiKey, config.shopify.apiSecret);
   const locationFetcher = new GraphQLLocationFetcher(config.shopify.apiVersion);
-  const graphql = new HttpShopifyGraphQLClient(config.shopify.apiVersion);
+  // Funnel all Shopify GraphQL through a per-store rate-limit queue (§6 step 10).
+  const rateLimitQueue = new PerStoreRateLimitQueue({
+    minIntervalMs: config.rateLimit.minIntervalMs,
+  });
+  const graphql = new RateLimitedGraphQLClient(
+    new HttpShopifyGraphQLClient(config.shopify.apiVersion),
+    rateLimitQueue,
+  );
 
   const server = createServer({
     config: {

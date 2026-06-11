@@ -30,7 +30,7 @@ required to run the suite):
   qty/status/price and hide deleted products (`src/shopify/webhooks.ts`). (§4.5)
 - Deploy config — Railway (`Dockerfile`, `railway.json`, `docs/DEPLOYMENT.md`).
 
-Run `npm test` (82 tests) and `npm run typecheck`.
+Run `npm test` (87 tests) and `npm run typecheck`.
 
 ---
 
@@ -53,7 +53,7 @@ Run `npm test` (82 tests) and `npm run typecheck`.
 | 1.3 | Run through auto-tagging/styling pipeline → auto-publish | `src/sync/catalogue.ts` | ☐ |
 | 1.4 | Apply Shopify-state → visibility rules (§5.3) | `src/sync/catalogue.ts`, `src/sync/visibility.ts` | ◑ `resolveVisibility` done + tested; applied during import pending |
 | 1.5 | Functional webhooks (`products/update`, `products/delete`, `inventory_levels/update`) | `src/shopify/webhooks.ts` | ◑ registered at install + handlers done & tested (qty refresh, status/price update, delete→hidden; numeric id → gid). Pending: verify live |
-| 1.6 | Per-store rate-limit queue | `src/safety/rateLimitQueue.ts` | ☐ |
+| 1.6 | Per-store rate-limit queue | `src/safety/rateLimitQueue.ts`, `src/index.ts` | ☑ `PerStoreRateLimitQueue` (serialise per store, parallel across stores) + `RateLimitedGraphQLClient` decorator wrapping all Shopify calls at the root. Done & tested |
 
 ## Phase 2 — Inventory writeback (PUSH)
 
