@@ -125,18 +125,28 @@ one conversation):
 
 # ✅ Answers received from Grape — and what they change
 
-### 1. Grape has **no variants** — each Shopify variant = one independent Grape product (SKU)
-- Mapping is **Shopify variant → one Grape product** (1:1). The parent Shopify
-  product is not represented on Grape.
-- `merchant_product_map` already keys at the variant level. When we build
-  publishing we'll **collapse the two Grape-id columns into a single
-  `grape_product_id`** per variant (`grape_listing_id` + `grape_variant_id` are
-  both currently unused/null — safe to change then).
-- **Publish transform:** each variant becomes a Grape product whose title
-  combines product title + variant options (e.g. "Button Tank Dress — S"),
-  carrying that variant's price, SKU, image, and the parent's description/images.
-- We'll fetch product **content** (title, description, images, options, SKU) from
-  Shopify **at publish time** (not stored in the mapping table) to keep it lean.
+### 1. Grape products map by **colour**, with **sizes inside** the product (corrected)
+- "No variants" means **colour-type options become separate Grape products**, but
+  **size is kept inside a single Grape product (one SKU per colour, with a size
+  run)**. Different sizes of the same colour are **the same Grape SKU**, each size
+  carrying its own stock.
+- So the grouping is **(Shopify product × colour) → one Grape product**, which
+  maps to **multiple Shopify variants — one per size**. Inventory/price is still
+  tracked per Shopify size-variant in `merchant_product_map`.
+- Data-model implication: a single `grape_product_id` is **shared across all the
+  size-variants of one colour** (1 Grape product : N Shopify size-variants), and
+  each size needs an identifier within the Grape product so a sale of a specific
+  size decrements the right Shopify variant.
+- We'll need the variant **option data** from Shopify (which option is colour vs
+  size) to group correctly — fetched at publish time.
+- ⚠️ **To confirm with Grape (new):**
+  - How are **sizes represented** within a Grape product — a list of size labels
+    each with their own stock, or does each size get its own Grape id?
+  - When a Grape order arrives, how is the **specific size identified** (so we
+    decrement the correct Shopify size-variant)?
+  - How do we know **which Shopify option is "colour" vs "size"** — match by
+    option name (Colour/Color/Size), or is it merchant-configured? (Naming varies
+    across stores.)
 
 ### 2. Sellers exist; no `seller_id` yet — match by seller **name** for now
 - Store **`grape_seller_name`** per installed store (set at onboarding); add
@@ -167,9 +177,11 @@ Shopify doesn't hold them:
 - `stores`: + `grape_seller_name`, `grape_seller_id` (nullable), `currency_code`,
   and merchant settings (shipping fee, return fee, free-shipping threshold) — or
   a separate `merchant_settings` table.
-- `merchant_product_map`: `grape_listing_id` + `grape_variant_id` → single
-  `grape_product_id`; + per-SKU fulfillment (processing time, delivery timeline,
-  returns accepted, exchange accepted).
+- `merchant_product_map`: `grape_listing_id` + `grape_variant_id` →
+  `grape_product_id` (shared across the size-variants of one colour) **plus a
+  size identifier** within that product; + per-SKU fulfillment (processing time,
+  delivery timeline, returns accepted, exchange accepted). Final shape depends on
+  how Grape represents sizes (see #1 follow-ups).
 
 ## Still needed from Grape (shorter list now)
 - The **create-product endpoint** + auth, and the **exact payload fields**
