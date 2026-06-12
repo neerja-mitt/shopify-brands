@@ -120,3 +120,61 @@ one conversation):
 - **Orders feed for the merchant portal:** how the portal reads a merchant's
   Grape orders (API/DB?) and writes back processed/shipped status — needed for
   Phase 3.
+
+---
+
+# ✅ Answers received from Grape — and what they change
+
+### 1. Grape has **no variants** — each Shopify variant = one independent Grape product (SKU)
+- Mapping is **Shopify variant → one Grape product** (1:1). The parent Shopify
+  product is not represented on Grape.
+- `merchant_product_map` already keys at the variant level. When we build
+  publishing we'll **collapse the two Grape-id columns into a single
+  `grape_product_id`** per variant (`grape_listing_id` + `grape_variant_id` are
+  both currently unused/null — safe to change then).
+- **Publish transform:** each variant becomes a Grape product whose title
+  combines product title + variant options (e.g. "Button Tank Dress — S"),
+  carrying that variant's price, SKU, image, and the parent's description/images.
+- We'll fetch product **content** (title, description, images, options, SKU) from
+  Shopify **at publish time** (not stored in the mapping table) to keep it lean.
+
+### 2. Sellers exist; no `seller_id` yet — match by seller **name** for now
+- Store **`grape_seller_name`** per installed store (set at onboarding); add
+  **`grape_seller_id`** later when Grape introduces it, and switch to it.
+- ⚠️ Name-matching is fragile (typos/renames). Push Grape to introduce a stable
+  seller id.
+
+### 3. NEW: fulfillment + fee attributes Grape needs — **not in Shopify**
+These must be collected from the **merchant** (onboarding / portal), since
+Shopify doesn't hold them:
+- **Per SKU:** processing time (default **immediate**, else 24/48/72h), delivery
+  timeline, returns accepted (Y/N), exchange accepted (Y/N).
+- **Per merchant:** shipping fee, return fee, free-shipping-over ₹X.
+- Implication: we need a **merchant settings** record + per-SKU fulfillment
+  fields, captured via the portal (Phase 3) with sensible defaults, and included
+  in the Grape publish payload.
+- **Follow-up for Grape:** exact field names/format, and whether they live on the
+  SKU payload, the merchant record, or both.
+
+### 4. India-only → currency is always ₹ (INR)
+- No multi-currency/conversion — simplifies pricing.
+- ⚠️ **Guard:** the merchant's Shopify store must be in INR (our dev store is
+  USD). We'll capture the store's `currencyCode` at install and flag/refuse if
+  it isn't INR, so we never publish a non-INR price.
+- Portal COD amounts + fees are all ₹.
+
+## Sharpened data-model target (build alongside publishing + portal)
+- `stores`: + `grape_seller_name`, `grape_seller_id` (nullable), `currency_code`,
+  and merchant settings (shipping fee, return fee, free-shipping threshold) — or
+  a separate `merchant_settings` table.
+- `merchant_product_map`: `grape_listing_id` + `grape_variant_id` → single
+  `grape_product_id`; + per-SKU fulfillment (processing time, delivery timeline,
+  returns accepted, exchange accepted).
+
+## Still needed from Grape (shorter list now)
+- The **create-product endpoint** + auth, and the **exact payload fields**
+  (incl. how images are passed + the #3 fulfillment/fee fields).
+- Whether create **returns the Grape product id** synchronously.
+- How to **update availability / price / visibility** and **unpublish**.
+- Confirm onboarded merchants will run **INR** Shopify stores.
+
